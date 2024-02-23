@@ -21,8 +21,20 @@
 
 void imageCallback(const sensor_msgs::msg::Image::ConstSharedPtr & msg)
 {
+// ------------- oggy from here ------------------//
+// After the image is compressed, the imaged is resized to for a certain display size 
+  cv::Mat image_before_resize = cv_bridge::toCvShare(msg, "bgr8")->image;
+  double subsampling_factor = 7.0;
+  int new_width = image_before_resize.cols / subsampling_factor + 0.5;
+  int new_height = image_before_resize.rows / subsampling_factor + 0.5;
+
+  cv::Mat image_after_resize;
+  cv::resize(image_before_resize, image_after_resize, cv::Size(new_width, new_height));
+
   try {
-    cv::imshow("view", cv_bridge::toCvShare(msg, "bgr8")->image);
+//    cv::imshow("view", cv_bridge::toCvShare(msg, "bgr8")->image);
+    cv::imshow("compressed", image_after_resize);
+// ------------- oggy to here ------------------//
     cv::waitKey(10);
   } catch (const cv_bridge::Exception & e) {
     auto logger = rclcpp::get_logger("my_subscriber");
@@ -35,12 +47,16 @@ int main(int argc, char ** argv)
   rclcpp::init(argc, argv);
   rclcpp::NodeOptions options;
   rclcpp::Node::SharedPtr node = rclcpp::Node::make_shared("image_listener", options);
-  cv::namedWindow("view");
+  // TransportHints does not actually declare the parameter
+  node->declare_parameter<std::string>("image_transport", "raw");
+  cv::namedWindow("compressed");
   cv::startWindowThread();
   image_transport::ImageTransport it(node);
-  image_transport::Subscriber sub = it.subscribe("camera/image", 1, imageCallback);
+  image_transport::TransportHints hints(node.get());
+//  image_transport::Subscriber sub = it.subscribe("camera/image", 1, imageCallback, &hints);
+  image_transport::Subscriber sub = it.subscribe("camera/color/image_raw", 1, imageCallback, &hints);
   rclcpp::spin(node);
-  cv::destroyWindow("view");
+  cv::destroyWindow("compressed");
 
   return 0;
 }
